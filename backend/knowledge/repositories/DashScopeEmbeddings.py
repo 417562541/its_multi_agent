@@ -61,3 +61,29 @@ class DashScopeEmbeddings(Embeddings):
             )
         embedding = resp.output["embeddings"][0]["embedding"]
         return embedding
+
+
+if __name__ == "__main__":
+    embeddings = DashScopeEmbeddings(model="text-embedding-v4")
+
+    # ---- 1. 单条 query 测试 ----
+    print("========== 测试 embed_query（单条） ==========")
+    query_emb = embeddings.embed_query("电脑如何开机")
+    print(f"query 向量维度: {len(query_emb)}")
+    print(f"query 向量前5维: {query_emb[:5]}")
+
+    # ---- 2. 批量 documents 测试（超过10条，验证分批逻辑） ----
+    print("\n========== 测试 embed_documents（批量 13 条 > BATCH_SIZE=10） ==========")
+    texts = [f"这是一段测试文本，用于验证批量 embedding 分批逻辑，第 {i} 条内容示例。" for i in range(13)]
+    doc_embs = embeddings.embed_documents(texts)
+    print(f"批量输入条数: {len(texts)}")
+    print(f"批量返回条数: {len(doc_embs)}")
+
+    # 校验数量一致
+    assert len(doc_embs) == len(texts), f"返回条数({len(doc_embs)})与输入条数({len(texts)})不一致"
+    # 校验向量维度一致
+    dims = {len(e) for e in doc_embs}
+    assert len(dims) == 1, f"向量维度不一致: {dims}"
+    print(f"批量向量维度: {dims}")
+
+    print("\n全部测试通过 ✔")

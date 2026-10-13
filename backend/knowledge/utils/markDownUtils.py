@@ -74,3 +74,25 @@ class MarkDownUtils:
 
         return cleaned.strip()
 
+    @staticmethod
+    def read_markdown_file(file_path: str) -> str:
+        """
+        根据文件路径读取markdown文件内容
+        :param file_path: md文件路径，相对路径 / 绝对路径都支持
+        :return: 返回md全文字符串
+        """
+        try:
+            # utf-8 编码，大部分md文件默认编码
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            return content
+        except FileNotFoundError:
+            return f"错误：文件不存在，路径={file_path}"
+        except UnicodeDecodeError:
+            # 遇到中文GBK编码md时备用
+            with open(file_path, "r", encoding="gbk") as f:
+                content = f.read()
+            return content
+        except Exception as e:
+            return f"读取异常：{str(e)}"
+

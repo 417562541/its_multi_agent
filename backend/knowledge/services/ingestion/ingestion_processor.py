@@ -14,7 +14,7 @@ class IngestionProcessor:
     def __init__(self):
         self.vector_store = self.vector_store = VectorStoreRepository()
         # 定义切分器
-        self.text_splitter = RecursiveCharacterTextSplitter(
+        self.document_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1500,
             chunk_overlap=200,
             separators=[
@@ -56,7 +56,7 @@ class IngestionProcessor:
                 # a.不用切分
                 final_document_chunks.append(doc)
             else:
-                documents_chunks_list = self.text_splitter.split_documents(doc)
+                documents_chunks_list = self.document_splitter.split_documents(doc)
                 # b:每个文档块的page_content注入标题（作为块的背景）
                 # page_content:来源:联想手机K900常见问题汇总 问题1:如何插拔SIM卡 K900采用Micro-Sim卡
                 for document_chunk in documents_chunks_list:

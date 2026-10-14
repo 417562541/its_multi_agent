@@ -69,7 +69,7 @@ class IngestionProcessor:
                     # 1.获取每一个文档块的标题
                     md_path = document_chunk.metadata['source']
 
-                    title = os.path.basename(md_path)
+                    title = MarkDownUtils.extract_title(md_path)
 
                     # 2.拼接到每一个文档块的page_content上
                     document_chunk.page_content = f"文档来源:{title}\n{document_chunk.page_content}"

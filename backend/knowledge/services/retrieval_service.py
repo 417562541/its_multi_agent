@@ -249,7 +249,7 @@ class RetrievalService:
         # 2. 获取标题
         doc_chunks_title = fine_md_metadata['title']
         # 3. 标题注入到文档块中
-        doc_chunks_inject_title = [f"文档标题:{doc_chunks_title}\n{chunk}" for chunk in doc_chunks]
+        doc_chunks_inject_title = [f"文档来源:{doc_chunks_title}\n{chunk}" for chunk in doc_chunks]
         # 4. 计算用户问题和文档块的得分
         # 4.1 对用户问题进行向量
         user_question_embedding = self.chroma_vector.embedd_document(user_question)
@@ -259,7 +259,7 @@ class RetrievalService:
         doc_chunks_similarity = cosine_similarity([user_question_embedding],
                                                   doc_chunks_inject_title_embedding).flatten()
         # 4.4 获取得分最高的3个索引
-        top_doc_chunks_similarity = doc_chunks_similarity.argsort()[-1:][::-1]
+        top_doc_chunks_similarity = doc_chunks_similarity.argsort()[-3:][::-1]
 
         docs = []
         for i, chunk_idx in enumerate(top_doc_chunks_similarity):
@@ -291,7 +291,7 @@ if __name__ == '__main__':
     #     print(f"\n{fine_ranking_with_score}")
 
     # print("====用户询问====")
-    # documents = retrieval_service.retrieval("我的电脑开机之后没有任何反应")
-    # for document in documents:
-    #     print("\n" )
-    #     print(document)
+    documents = retrieval_service.retrieval("联想收集K900常见问题汇总有哪些")
+    for document in documents:
+        print("\n" )
+        print(document)

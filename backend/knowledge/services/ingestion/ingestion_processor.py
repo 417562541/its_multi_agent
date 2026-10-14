@@ -5,6 +5,8 @@ from langchain_community.vectorstores.utils import filter_complex_metadata
 import logging
 import os
 
+from backend.knowledge.utils.markDownUtils import MarkDownUtils
+
 logger = logging.getLogger(__name__)
 class IngestionProcessor:
     """
@@ -47,6 +49,10 @@ class IngestionProcessor:
         except Exception as e:
             logger.error(f"Error loading document: {e}")
             raise Exception(f"Error loading document: {e}")
+
+        for doc in documents:
+            doc.metadata['title'] = MarkDownUtils.extract_title(md_path)
+
         # 2. 切分文档
         # 注意：TextLoader.load() 返回 List[Document]，必须用 split_documents()；
         # split_text() 只接受字符串，传入 Document 列表会报 "expected string or bytes-like object"
@@ -56,7 +62,7 @@ class IngestionProcessor:
                 # a.不用切分
                 final_document_chunks.append(doc)
             else:
-                documents_chunks_list = self.document_splitter.split_documents(doc)
+                documents_chunks_list = self.document_splitter.split_documents([doc])
                 # b:每个文档块的page_content注入标题（作为块的背景）
                 # page_content:来源:联想手机K900常见问题汇总 问题1:如何插拔SIM卡 K900采用Micro-Sim卡
                 for document_chunk in documents_chunks_list:
@@ -70,7 +76,7 @@ class IngestionProcessor:
                 final_document_chunks.extend(documents_chunks_list)
 
         # 3.过滤不被向量数据库支持的元数据
-        clean_documents_chunks = filter_complex_metadata(documents_chunks_list)
+        clean_documents_chunks = filter_complex_metadata(final_document_chunks)
 
         # 4.无效性校验 （校验page_content是否合法）
         valid_documents_chunks = [document for document in clean_documents_chunks if document.page_content.strip()]

@@ -88,9 +88,9 @@ class RetrievalService:
                 })
                 based_title_candidates.append(doc)
             else:
-                self._deal_long_title_content(content, fine_md_metadata, user_question)
-                pass
-        pass
+                docs = self._deal_long_title_content(content, fine_md_metadata, user_question)
+                based_title_candidates.extend(docs)
+        return based_title_candidates
 
     def _deduplicate(self, total_candiates: List[Document]) -> List[Document]:
         """
@@ -99,6 +99,16 @@ class RetrievalService:
         :param total_candiates: 合并后的文档列表
         :return:  List[Document] 去重后的文档列表
         """
+        if not total_candiates:
+            return []
+        seen = set()
+        unique_candidates = []
+        for document in total_candiates:
+            key = (document.metadata['title'], document.page_content[:100])
+            if key not in seen:
+                seen.add(key)
+                unique_candidates.append(document)
+        return unique_candidates
 
     def _reranking(self, unique_candidates: List[Document], user_question: str) -> List[Document]:
         """
@@ -106,6 +116,39 @@ class RetrievalService:
         :param user_question: 用户问题
         :return: 最终返回的文档列表
         """
+        if not unique_candidates:
+            return []
+        # 1. 遍历去重合并之后的文档列表
+        need_embedding_docs = []
+        # need_embedding_candidates_indices = []
+        score_docs = []
+        for index, unique_candidate in enumerate(unique_candidates):
+            # 1.1 判断是否需要计算分数
+            if "chunk_index" in unique_candidate.metadata and "similarity" in unique_candidate.metadata:
+                score_docs.append((unique_candidate, unique_candidate.metadata['similarity']))
+            else:
+                # need_embedding_candidates_indices.append(index)
+                need_embedding_docs.append(unique_candidate)
+        # 2. 计算需要重新计算分数的文档
+        if need_embedding_docs:
+            # 2.1 计算用户问题的向量
+            user_question_embedding = self.chroma_vector.embedd_document(user_question)
+            # 2.2 获取到需要向量的文档内容
+            docs_contents = ["文档来源:" + doc.metadata['title'] + doc.page_content for doc in
+                             need_embedding_docs]
+            # 2.3 计算需要向量的文档内容
+            docs_contents_embedding = self.chroma_vector.embedd_documents(docs_contents)
+
+            # 2.4 计算相似得分
+            similarity = cosine_similarity([user_question_embedding], docs_contents_embedding).flatten()
+
+            # 2.5 封装到带得分的文档列表
+            for idx, similarity in enumerate(similarity):
+                score_docs.append((need_embedding_docs[idx], similarity))
+        # 3. 排序
+        sorted_docs = sorted(score_docs, key=lambda x: x[1], reverse=True)
+        # 4. 返回Top-N
+        return [doc for doc, _ in sorted_docs[:2]]
 
     def rough_ranking(self, user_question: str, mds_metadata: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
@@ -191,7 +234,8 @@ class RetrievalService:
         # 7. 排序
         return sorted(mds_metadata, key=lambda x: x['final_score'], reverse=True)[:5]
 
-    def _deal_long_title_content(self, content: str, fine_md_metadata: Dict[str, Any], user_question: str) -> List[Document]:
+    def _deal_long_title_content(self, content: str, fine_md_metadata: Dict[str, Any], user_question: str) -> List[
+        Document]:
         """
          处理标题对应的长文本
          切分 -> 文档快 -> 算文档块和问题的相似度（）
@@ -205,21 +249,22 @@ class RetrievalService:
         # 2. 获取标题
         doc_chunks_title = fine_md_metadata['title']
         # 3. 标题注入到文档块中
-        doc_chunks_inject_title = [f"文档标题:{doc_chunks_title}\n{chunk}" for chunk in doc_chunks ]
+        doc_chunks_inject_title = [f"文档标题:{doc_chunks_title}\n{chunk}" for chunk in doc_chunks]
         # 4. 计算用户问题和文档块的得分
         # 4.1 对用户问题进行向量
         user_question_embedding = self.chroma_vector.embedd_document(user_question)
         # 4.2 对文档快进行向量
         doc_chunks_inject_title_embedding = self.chroma_vector.embedd_documents(doc_chunks_inject_title)
         # 4.3 计算得分
-        doc_chunks_similarity = cosine_similarity([user_question_embedding], doc_chunks_inject_title_embedding).flatten()
+        doc_chunks_similarity = cosine_similarity([user_question_embedding],
+                                                  doc_chunks_inject_title_embedding).flatten()
         # 4.4 获取得分最高的3个索引
         top_doc_chunks_similarity = doc_chunks_similarity.argsort()[-1:][::-1]
 
         docs = []
-        for i,chunk_idx in enumerate(top_doc_chunks_similarity):
+        for i, chunk_idx in enumerate(top_doc_chunks_similarity):
             doc = Document(
-                page_content= doc_chunks_inject_title[chunk_idx],
+                page_content=doc_chunks_inject_title[chunk_idx],
                 metadata={
                     "path": fine_md_metadata['path'],
                     "title": fine_md_metadata['title'],
@@ -231,18 +276,22 @@ class RetrievalService:
         return docs
 
 
-
 if __name__ == '__main__':
     retrieval_service = RetrievalService()
-    mds_metadata = MarkDownUtils.collect_md_metadata(settings.CRAWL_OUTPUT_DIR)
-    rough_rankings_with_score = retrieval_service.rough_ranking(user_question="电脑如何开机", mds_metadata=mds_metadata)
+    # mds_metadata = MarkDownUtils.collect_md_metadata(settings.CRAWL_OUTPUT_DIR)
+    # rough_rankings_with_score = retrieval_service.rough_ranking(user_question="电脑如何开机", mds_metadata=mds_metadata)
 
-    print("====粗排结果====")
-    for rough_ranking_with_score in rough_rankings_with_score:
-        print(f"\n{rough_ranking_with_score}")
+    # print("====粗排结果====")
+    # for rough_ranking_with_score in rough_rankings_with_score:
+    #     print(f"\n{rough_ranking_with_score}")
+    # fine_rankings_with_score = retrieval_service.fine_ranking("电脑如何开机", rough_rankings_with_score)
 
-    fine_rankings_with_score = retrieval_service.fine_ranking("电脑如何开机", rough_rankings_with_score)
+    # print("====精排结果====")
+    # for fine_ranking_with_score in fine_rankings_with_score:
+    #     print(f"\n{fine_ranking_with_score}")
 
-    print("====精排结果====")
-    for fine_ranking_with_score in fine_rankings_with_score:
-        print(f"\n{fine_ranking_with_score}")
+    # print("====用户询问====")
+    # documents = retrieval_service.retrieval("我的电脑开机之后没有任何反应")
+    # for document in documents:
+    #     print("\n" )
+    #     print(document)

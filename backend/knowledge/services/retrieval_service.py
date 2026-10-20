@@ -291,7 +291,7 @@ if __name__ == '__main__':
     #     print(f"\n{fine_ranking_with_score}")
 
     # print("====用户询问====")
-    documents = retrieval_service.retrieval("联想收集K900常见问题汇总有哪些")
+    documents = retrieval_service.retrieval("插拔sim卡")
     for document in documents:
         print("\n" )
         print(document)

@@ -115,15 +115,30 @@ def run_local_tools(question: str) -> str:
 # 本地不需要实现具体函数，只需在 tools 中声明 MCP Server 信息
 # ============================================================
 
-# 请将下面的 server_url / headers 替换为你实际使用的第三方 MCP 服务
-# （阿里云百炼内置的 WebParser、高德地图等 MCP 服务可直接使用）
+# MCP 客户端必须走百炼官方兼容地址（第三方代理 base_url 一般不支持 mcp 工具）
+mcp_client = OpenAI(
+    api_key=os.getenv("DASHSCOPE_API_KEY"),
+    base_url=os.getenv(
+        "MCP_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    ),
+)
+
+# 百炼 MCP 广场托管服务的端点规则（以 WebFetch 网页抓取为例）：
+#   Streamable HTTP：https://dashscope.aliyuncs.com/api/v1/mcps/{服务名}/mcp
+#   旧版 SSE：       https://dashscope.aliyuncs.com/api/v1/mcps/{服务名}/sse
+# 关键经验（实测）：
+#   1. server_protocol 合法值为 "sse" 或 "streamableHttp"（不是 http/streamable_http）；
+#   2. 百炼广场新服务的 /sse 端点已不再推送事件（连接成功但发现不到工具），
+#      平台会静默丢弃该 MCP 配置——模型拿不到工具，就只会在文本里"假装调用"；
+#      必须用 /mcp 端点 + "streamableHttp"，才能在 output 里看到 mcp_call。
+#   3. 需先在百炼控制台「MCP 广场」开通对应服务（WebFetch 为 One Key 服务，首次调用自动生效）。
 mcp_tools = [
     {
         "type": "mcp",
-        "server_protocol": "sse",          # 当前仅支持 sse
-        "server_label": "WebParser",       # 服务标签，用于标识该 MCP Server
-        "server_description": "网页解析（WebParser）MCP 服务，用于解析指定网页的内容。",
-        "server_url": "https://your-mcp-server-endpoint/sse",
+        "server_protocol": "streamableHttp",  # 百炼广场 MCP 用这个
+        "server_label": "WebFetch",           # 服务标签，需与实际服务对应
+        "server_description": "网页抓取（WebFetch）MCP 服务，抓取指定 URL 的网页内容并转为文本。",
+        "server_url": "https://dashscope.aliyuncs.com/api/v1/mcps/WebFetch/mcp",
         "headers": {
             "Authorization": "Bearer " + os.getenv("DASHSCOPE_API_KEY", "")
         },
@@ -133,12 +148,17 @@ mcp_tools = [
 
 def run_mcp_tools(question: str) -> str:
     """第三方 MCP 工具：一次请求即可，平台自动完成 mcp_call"""
-    response = client.responses.create(
+    response = mcp_client.responses.create(
         model=MODEL,
         input=question,
         tools=mcp_tools,
     )
-    # 中间过程可在 response.output 中查看 type == "mcp_call" 的条目
+    # 调试：打印每一项输出类型，确认平台是否真的发起了 mcp_call
+    for item in response.output:
+        print(f"[MCP] 输出项类型：{item.type}")
+        if item.type == "mcp_call":
+            print(f"    [MCP] 调用服务：{item.server_label} / 工具：{item.name}")
+            print(f"    [MCP] 调用参数：{item.arguments}")
     return response.output_text
 
 
@@ -163,14 +183,14 @@ def run_builtin_web_search(question: str) -> str:
 
 if __name__ == "__main__":
     # 1. 本地工具
-    print("=" * 20, "本地工具（自定义 function）", "=" * 20)
-    answer = run_local_tools("北京天气怎么样？顺便告诉我现在几点了。")
-    print("最终回复：", answer)
+    # print("=" * 20, "本地工具（自定义 function）", "=" * 20)
+    # answer = run_local_tools("北京天气怎么样？顺便告诉我现在几点了。")
+    # print("最终回复：", answer)
 
-    # 2. 第三方工具（需先把 mcp_tools 中的 server_url 替换为真实可用的 MCP 服务）
+    # 2. 第三方工具（需先在百炼 MCP 广场开通 WebFetch 服务）
     print("=" * 20, "第三方工具（MCP）", "=" * 20)
-    print(run_mcp_tools("解析这个网页的内容：https://example.com"))
+    print(run_mcp_tools("请使用 WebFetch 抓取并总结这个网页的内容：https://insure.travelsky.com.cn/eTermServices/Insure/index.jsp"))
 
     # 3. 内置工具：联网搜索
-    print("=" * 20, "内置工具（web_search）", "=" * 20)
-    print(run_builtin_web_search("查一下今天的科技新闻，列出一条即可。"))
+    # print("=" * 20, "内置工具（web_search）", "=" * 20)
+    # print(run_builtin_web_search("查一下今天的科技新闻，列出一条即可。"))

@@ -1,5 +1,9 @@
 import asyncio
+
+import os
 from openai import AsyncOpenAI
+from dotenv import load_dotenv
+load_dotenv()
 from agents import (
     Agent,
     Model,
@@ -12,9 +16,9 @@ from agents import (
     set_tracing_disabled,
 )
 
-BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-API_KEY = "sk-26d57c968c364e7bb14f1fc350d4bff0"
-MODEL_NAME = "qwen-plus"
+BASE_URL =  os.getenv( "BASE_URL")
+API_KEY = os.getenv("API_KEY")
+MODEL_NAME = "qwen3.8-max"
 
 
 # ===================== 方式1：全局注册默认客户端 set_default_openai_client =====================
@@ -84,9 +88,9 @@ async def run_agent_direct_model():
 # ===================== 入口，按需开启执行 =====================
 async def main():
     # 取消注释，切换测试，不要同时跑方式1，因为会污染全局client
-    # await run_agent_global()
+    await run_agent_global()
     await run_agent_provider()
-    # await run_agent_direct_model()
+    await run_agent_direct_model()
 
 
 if __name__ == "__main__":

@@ -115,14 +115,6 @@ def run_local_tools(question: str) -> str:
 # 本地不需要实现具体函数，只需在 tools 中声明 MCP Server 信息
 # ============================================================
 
-# MCP 客户端必须走百炼官方兼容地址（第三方代理 base_url 一般不支持 mcp 工具）
-mcp_client = OpenAI(
-    api_key=os.getenv("DASHSCOPE_API_KEY"),
-    base_url=os.getenv(
-        "MCP_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    ),
-)
-
 # 百炼 MCP 广场托管服务的端点规则（以 WebFetch 网页抓取为例）：
 #   Streamable HTTP：https://dashscope.aliyuncs.com/api/v1/mcps/{服务名}/mcp
 #   旧版 SSE：       https://dashscope.aliyuncs.com/api/v1/mcps/{服务名}/sse
@@ -148,7 +140,7 @@ mcp_tools = [
 
 def run_mcp_tools(question: str) -> str:
     """第三方 MCP 工具：一次请求即可，平台自动完成 mcp_call"""
-    response = mcp_client.responses.create(
+    response = client.responses.create(
         model=MODEL,
         input=question,
         tools=mcp_tools,
@@ -188,9 +180,9 @@ if __name__ == "__main__":
     # print("最终回复：", answer)
 
     # 2. 第三方工具（需先在百炼 MCP 广场开通 WebFetch 服务）
-    print("=" * 20, "第三方工具（MCP）", "=" * 20)
-    print(run_mcp_tools("请使用 WebFetch 抓取并总结这个网页的内容：https://insure.travelsky.com.cn/eTermServices/Insure/index.jsp"))
+    # print("=" * 20, "第三方工具（MCP）", "=" * 20)
+    # print(run_mcp_tools("请使用 WebFetch 抓取并总结这个网页的内容：https://insure.travelsky.com.cn/eTermServices/Insure/index.jsp"))
 
     # 3. 内置工具：联网搜索
     # print("=" * 20, "内置工具（web_search）", "=" * 20)
-    # print(run_builtin_web_search("查一下今天的科技新闻，列出一条即可。"))
+    print(run_builtin_web_search("查一下今天的科技新闻，列出一条即可。"))

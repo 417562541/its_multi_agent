@@ -1,5 +1,5 @@
-from infrastructure.logging.logger import logger
-from infrastructure.tools.mcp.mcp_servers import (
+from backend.app.infrastructure.logging.logger import logger
+from backend.app.infrastructure.tools.mcp.mcp_servers import (
     search_mcp_client,
     baidu_mcp_client,
 )
